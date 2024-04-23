@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Quart and Socket.IO Test</title>
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <script type="text/javascript">
+        document.addEventListener('DOMContentLoaded', function() {
+            const outputElement = document.getElementById('output');
+            const inputElement = document.getElementById('input');
+            const sendButton = document.getElementById('send');
+
+            // Connect to the Socket.IO server
+            // const socket = io.connect('http://' + document.domain + ':' + location.port);
+            const socket = io('http://localhost:8000');
+
+            socket.on('connect', function() {
+                outputElement.innerHTML += '<p>Connected to the server.</p>';
+            });
+
+            // Listen for messages from the server
+            socket.on('message', function(data) {
+                console.log('Received message:', data);
+                outputElement.innerHTML += `<p>Received: ${data.data}</p>`;
+            });
+
+            // Emit a message when the send button is clicked
+            sendButton.onclick = function() {
+                let message = inputElement.value;
+                socket.emit('send_message', {data: message});
+                outputElement.innerHTML += `<p>Sent: ${message}</p>`;
+                inputElement.value = '';
+            };
+        });
+    </script>
+</head>
+<body>
+    <h1>Socket.IO and Quart Communication Test</h1>
+    <input type="text" id="input" placeholder="Enter a message" />
+    <button id="send">Send Message</button>
+    <div id="output"></div>
+</body>
+</html>

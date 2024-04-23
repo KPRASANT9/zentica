@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>CHAT BOT</title>
+    <script type="text/javascript">
+        document.addEventListener('DOMContentLoaded', function() {
+            const consoleElement = document.getElementById('output');
+            const inputElement = document.getElementById('input');
+            const sendButton = document.getElementById('send');
+
+            channel = JSON.parse(sessionStorage.getItem('channel'))
+            console.log("value from session storage:", channel)
+
+            channel.onmessage = function(event) {
+                // console.log("SDP final state remote:", pc.sdp);
+                consoleElement.innerHTML += `<p>Received: ${event.data}</p>`;
+                console.log(`Message received on ${channel.label}: ${event.data}`);
+            };
+
+            channel.onclose = function(event) {
+                console.log(`Data channel ${channel.label} closed.`);
+            };
+            
+            // Emit a message when the send button is clicked
+            sendButton.onclick = function() {
+                let message = inputElement.value;
+                dataChannel.send(message);
+                consoleElement.innerHTML += `<p>Sent: ${message}</p>`;
+                inputElement.value = '';
+            };
+        });
+    </script>
+</head>
+<body>
+    <h1>CHAT BOT</h1>
+    <input type="text" id="input" placeholder="Enter a message" />
+    <button id="send">Send</button>
+    <div id="output"></div>
+</body>
+</html>

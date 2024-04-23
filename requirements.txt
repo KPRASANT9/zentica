@@ -1,0 +1,14 @@
+pymongo
+setuptools==69.2.0
+flask
+wheel==0.43.0
+requests
+flask_socketio
+flask-cors
+aiortc
+eventlet
+quart
+python-socketio
+quart-cors
+aioconsole
+waitress

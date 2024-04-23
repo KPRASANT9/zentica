@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>WebSocket Test</title>
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const outputElement = document.getElementById('output');
+            const inputElement = document.getElementById('input');
+            const sendButton = document.getElementById('send');
+            const createOfferButton = document.getElementById('create-offer');
+            const params = new URLSearchParams(window.location.search)
+            console.log("params from registration page",params.get('DeviceID'))
+
+            var socket = io(
+                'http://localhost:8000', {
+                query: {
+                    DeviceID: params.get('DeviceID')
+                }
+            });
+            
+            socket.on('connect', function() {
+                console.log('Connected to SocketIO server!');
+            });
+
+            socket.on('your_session_id', data => {
+                console.log('My session ID is:', data.sid);
+            });
+
+            socket.on('disconnect', function() {
+                dataChannel.close()
+                pc.close();
+                console.log('Disconnected from server');
+            });
+
+            socket.on('no_peers', function(msg) {
+                console.log('No remote peers has been found');
+            });
+
+            socket.on('refine_request', function(msg) {
+                console.log('People found but unable to server your request, can you refine your search?');
+            });
+
+            const configuration = {
+                sdpSemantics: 'unified-plan',
+                // iceServers: [
+                //     { urls: 'stun:stun.l.google.com:19302' }, // Google's public STUN server
+                //     {
+                //         urls: 'turn:turn.example.com',
+                //         username: 'turnUser',
+                //         credential: 'turnPassword'
+                //     }
+                // ]
+            };
+            
+            var pc = new RTCPeerConnection(configuration);
+            
+            socket.on('message', async function(msg) {
+                // console.log('Received message from server:', msg);
+                const data = JSON.parse(msg);
+                console.log(Date.now(),'Message from signalling server:', data);
+                if (data.type === 'offer') {
+                    console.log("controller for offer", data)
+                    await handleOfferAndCreateAnswer(data.offer);
+                } else if (data.type === 'answer') {
+                    console.log("controller for answer", data)
+                    await handleAnswer(data);
+                } 
+                else if (data.type === 'candidate') {
+                    console.log("controller for candiate", data)
+                    pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+                }                
+            });
+
+            pc.onicecandidate = event => {
+                    if (event.candidate) {
+                        console.log('calling ice candidate')
+                        // waiting for specific time to ensure offers has been broadcasted to all the peers
+                        // TODO: Make the timing event based once the answer has been received from the peer.
+                        setTimeout(() => {
+                                socket.send(JSON.stringify({type: 'candidate', candidate: event.candidate}));
+                                // console.log("Message sent after 1 second");
+                            }, 1000);                    
+                    }
+                };
+
+            pc.onsignalingstatechange = event => {
+                console.log("signalling state change event:", event)
+            }
+
+            pc.oniceconnectionstatechange = () => {
+                console.log(`ICE Connection State: ${pc.iceConnectionState}`);
+            };
+
+            pc.onicecandidateerror = event => {
+                console.error('ICE Candidate Error:', event);
+            };
+            
+            pc.onconnectionstatechange = () => {
+                console.log(`connection State change: ${pc.connectionState}`);
+                if (pc.connectionState === "failed") {
+                    console.error("Peer Connection Failed.");
+                    console.log(pc)
+                    // refresh the browswer for availabity in fleet once the connection has been dropped.
+                    window.location.reload()
+                    // Implement recovery or reconnection strategies here
+                    // recoverConnection(pc);
+                }
+            };
+
+            // Event handlers
+
+                async function handleOfferAndCreateAnswer(offer) {
+                    try {
+                        remote_description = new RTCSessionDescription(offer)
+                        await pc.setRemoteDescription(remote_description);
+                        const answer = await pc.createAnswer();
+                        await pc.setLocalDescription(answer);
+                        console.log('answer created successfully')
+
+                        // Send the answer back to the offerer via the signaling server
+                        socket.send(JSON.stringify({
+                            'type': pc.localDescription.type,
+                            'sdp': pc.localDescription.sdp
+                        }));
+                    } catch (error) {
+                        console.error('Error handling offer or creating answer:', error);
+                    }
+                }
+
+                async function handleAnswer(answer) {
+                    try {
+                        console.log("working on handling answer:", answer)
+                        const remoteDesc = new RTCSessionDescription({type: 'answer', sdp: answer.sdp});
+                        await pc.setRemoteDescription(remoteDesc);
+                        console.log("Remote description set successfully")
+
+                    } catch (error) {
+                        console.error('Error setting remote description from answer:', error);
+                    }
+                }
+
+                pc.ondatachannel = function(event) {
+                    const channel = event.channel;
+                    console.log(`Data channel received: ${channel.label}`);
+
+                    // Set event handlers for the data channel
+                    channel.onopen = function() {
+                        console.log(`Data channel ${channel.label} opened by remote peer.`);
+                        // socket.emit('chat_established', {'data': 'connected'});
+                        socket.send(JSON.stringify({type: 'dataChannelOpened'}));
+                    };
+
+                    channel.onmessage = function(event) {
+                        console.log("SDP final state local:", pc.localDescription.sdp);
+                        console.log("SDP final state remote:", pc.remoteDescription.sdp);
+                        // console.log("SDP final state remote:", pc.sdp);
+                        outputElement.innerHTML += `<p>From Needy: ${event.data}</p>`;
+                        console.log(`Message received on ${channel.label}: ${event.data}`);
+                    };
+
+                    channel.onclose = function() {
+                        console.log(`Data channel ${channel.label} closed.`);
+                    };
+
+                    sendButton.onclick = function() {
+                        let message = inputElement.value;
+                        channel.send(message);
+                        outputElement.innerHTML += `<p>Sent: ${message}</p>`;
+                        inputElement.value = '';
+                    };
+                };
+
+            createOfferButton.onclick = function(event) {
+            // Incorporate communication channel
+                console.log("create offer event data:", event)
+                const dataChannel = pc.createDataChannel("chat");
+
+                pc.createOffer().then(offer => {
+                    pc.setLocalDescription(offer);
+                    console.log("Offer function has been activated")
+                    console.log(pc)
+                    socket.send(JSON.stringify({type: 'offer', offer: offer}));
+                }).catch(e => console.error(e));
+
+            //State change events
+
+                dataChannel.onmessage = function (event) {
+                    // outputElement.innerHTML += '<p>From remote server:' event.data '</p>';
+                    console.log("SDP final state local:", pc.localDescription.sdp);
+                    console.log("SDP final state remote:", pc.remoteDescription.sdp);
+                    outputElement.innerHTML += `<p>From Jenie: ${event.data}</p>`;
+                    console.log("Message from client:", event.data);
+                };
+
+                sendButton.onclick = event => {
+                    let message = inputElement.value;
+                    dataChannel.send(message);
+                    outputElement.innerHTML += `<p>Sent: ${message}</p>`;
+                    inputElement.value = '';
+                };
+            }
+        });
+    </script>
+</head>
+<body>
+    <h1>Socket.IO and Quart Communication Test</h1>
+    <input type="text" id="input" placeholder="Enter a message" />
+    <button id="send">Send Message</button>
+    <button id="create-offer">create offer</button>
+    <div id="output"></div>
+    <p>Check the console for messages.</p>
+</body>
+</html>
+

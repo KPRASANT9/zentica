@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to GENIE</title>
+    <link rel="stylesheet" href="/static/css/geniestyle.css"> <!-- Link to CSS file for styling -->
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+</head>
+<body>
+    <div class="form-container" id='genieForm' style="display: block">
+        <form id="genieForm">
+            <!-- <h2>GENIE</h2> -->
+            <div class="input-group">
+                <label for="wish" ></label>
+                <input type="text" id="wish" placeholder="Make a wish" name="wish" required >
+            </div>
+            <div class="input-group">
+                <label for="bid-value" ></label>
+                <input type="text" id="bid-value" placeholder="Bid value: $" name="bid-value" required >
+            </div>
+            <!-- <div>
+                <label for="rangeSlider"></label>
+                <input type="range" id="rangeSlider" name="volume" min="0" max="100" value="50">
+                <output id="rangeValue" for="rangeSlider"></output>
+            </div> -->
+            <button type="submit" id="broadcast">Broadcast</button>
+            <!-- <a href="/static/client.html"></a> -->
+            <div id="output"></div>
+        </form>
+    </div>
+    <div class="form-container" id='chatForm' style="display: none">
+        <form id="chatForm">
+            <h2>CHAT BOT</h2>
+            <div class="input-group">
+                <label for="input" ></label>
+                <input type="text" id="input" placeholder="Enter message" name="input" required >
+            </div>
+            <!-- <div class="input-group">
+                <label for="bid-value" ></label>
+                <input type="text" id="bid-value" placeholder="Bid value: $" name="bid-value" required >
+            </div> -->
+            <!-- <div>
+                <label for="rangeSlider"></label>
+                <input type="range" id="rangeSlider" name="volume" min="0" max="100" value="50">
+                <output id="rangeValue" for="rangeSlider"></output>
+            </div> -->
+            <button type="submit" id="send">Send</button>
+            <!-- <a href="/static/client.html"></a> -->
+            <div id="chatConsole"></div>
+        </form>
+    </div>
+    <script src="/static/js/genie-script.js"></script>
+</body>
+</html>
