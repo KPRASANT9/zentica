@@ -2,10 +2,11 @@ document.getElementById('registrationForm').addEventListener('submit', function(
     event.preventDefault(); // Prevent the default form submission
 
     const username = document.getElementById('username').value;
-    const location = document.getElementById('location').value;
-    const profile = document.getElementById('profile').value;
+    // const location = document.getElementById('location').value;
+    // const profile = document.getElementById('profile').value;
+    const profile = selectedItems
 
-    console.log('Registering:', username, location, profile);
+    console.log('Registering:', username, profile);
 
     // Post request to load the User information.
     fetch('https://meet-basilisk-adversely.ngrok-free.app/api/device/register', {
@@ -13,7 +14,7 @@ document.getElementById('registrationForm').addEventListener('submit', function(
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({"DeviceID": username, "Location": location, "Profile": profile})
+        body: JSON.stringify({"DeviceID": username, "Profile": profile})
     })
     .then(response => response.json())
     .then(

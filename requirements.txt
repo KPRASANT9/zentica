@@ -12,3 +12,5 @@ python-socketio
 quart-cors
 aioconsole
 waitress
+apscheduler
+python-dotenv

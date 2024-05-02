@@ -1,7 +1,9 @@
 document.addEventListener('DOMContentLoaded', function () {
     const wishMessage = document.getElementById('wish');
+    const bufferTime = document.getElementById('bufferTime');
+    const rangeValue = document.getElementById('rangeSlider');
     const bidValue = document.getElementById('bid-value');
-    const broadcastButton = document.getElementById('broadcast');  
+    const broadcastButton = document.getElementById('broadcast');
     const consoleElement = document.getElementById('output');
     const params = new URLSearchParams(window.location.search)
 
@@ -10,6 +12,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var genieLayout = document.getElementById('genieForm')
 
     const chatSendButton = document.getElementById('send');
+    const chatEndButton = document.getElementById('end');
     const chatInputElement = document.getElementById('input');
     const chatConsoleElement = document.getElementById('chatConsole');
 
@@ -20,7 +23,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (navigator.geolocation) {
           navigator.geolocation.getCurrentPosition(showPosition, showError, {
             enableHighAccuracy: true,
-            timeout: 10000,
+            timeout: 50000,
             maximumAge: 0
           });
         } else {
@@ -29,13 +32,14 @@ document.addEventListener('DOMContentLoaded', function () {
       }
     
     function showPosition(position) {
-        socket.emit('update_location', JSON.stringify({data: position}))
         console.log("Latitude: " + position.coords.latitude +
                     "\nLongitude: " + position.coords.longitude +
                     "\nAccuracy: " + position.coords.accuracy + " meters.");
+        socket.emit('update_location', JSON.stringify({'data': [position.coords.latitude, position.coords.longitude]}))
     }
       
     function showError(error) {
+        // TODO: Give the user a prompt to enter the location when any of the error codes are obtained.
         switch(error.code) {
             case error.PERMISSION_DENIED:
             console.log("User denied the request for Geolocation.");
@@ -76,11 +80,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
     socket.on('disconnect', function() {
         pc.close();
+        window.location.reload()
         console.log('Disconnected from server');
     });
 
     socket.on('no_peers', function(msg) {
-        console.log('No remote peers has been found');
+        //TODO: stream interactivity and update the user on refinement accordingly
+        console.log('No remote peers has been found, please find the logs for details:', msg);
+        
         // wishMessage.value = '';
         // bidValue.value = '';
         consoleElement.innerHTML = `<p>No one found in your area. Customers are actively adapting to the platform. Stay tuned:)</p>`;
@@ -105,26 +112,29 @@ document.addEventListener('DOMContentLoaded', function () {
         iceServers: 
         [
             {
-                "url": "stun:global.stun.twilio.com:3478",
-                "urls": "stun:global.stun.twilio.com:3478",
+              url: "stun:global.stun.twilio.com:3478",
+              urls: "stun:global.stun.twilio.com:3478",
             },
             {
-                "url": "turn:global.turn.twilio.com:3478?transport=udp",
-                "username": "11dcd091f69945cc6594b4db007136722e3c266b610632f1087ca36c6da64dac",
-                "urls": "turn:global.turn.twilio.com:3478?transport=udp",
-                "credential": "6Z6TPhGWJm6f5eY1o4J7Ms/V6L3XbSklCkGdNk9lnZk=",
+              url: "turn:global.turn.twilio.com:3478?transport=udp",
+              username:
+                "5b948663db2623bad1234b2300a72e848d8136907b0d6626171568adbbd2639a",
+              urls: "turn:global.turn.twilio.com:3478?transport=udp",
+              credential: "kinojVMV42dAkPGv6NnZluFLbxumRuO3noSnkZpnfcg=",
             },
             {
-                "url": "turn:global.turn.twilio.com:3478?transport=tcp",
-                "username": "11dcd091f69945cc6594b4db007136722e3c266b610632f1087ca36c6da64dac",
-                "urls": "turn:global.turn.twilio.com:3478?transport=tcp",
-                "credential": "6Z6TPhGWJm6f5eY1o4J7Ms/V6L3XbSklCkGdNk9lnZk=",
+              url: "turn:global.turn.twilio.com:3478?transport=tcp",
+              username:
+                "5b948663db2623bad1234b2300a72e848d8136907b0d6626171568adbbd2639a",
+              urls: "turn:global.turn.twilio.com:3478?transport=tcp",
+              credential: "kinojVMV42dAkPGv6NnZluFLbxumRuO3noSnkZpnfcg=",
             },
             {
-                "url": "turn:global.turn.twilio.com:443?transport=tcp",
-                "username": "11dcd091f69945cc6594b4db007136722e3c266b610632f1087ca36c6da64dac",
-                "urls": "turn:global.turn.twilio.com:443?transport=tcp",
-                "credential": "6Z6TPhGWJm6f5eY1o4J7Ms/V6L3XbSklCkGdNk9lnZk=",
+              url: "turn:global.turn.twilio.com:443?transport=tcp",
+              username:
+                "5b948663db2623bad1234b2300a72e848d8136907b0d6626171568adbbd2639a",
+              urls: "turn:global.turn.twilio.com:443?transport=tcp",
+              credential: "kinojVMV42dAkPGv6NnZluFLbxumRuO3noSnkZpnfcg=",
             }
         ]
     };
@@ -137,7 +147,13 @@ document.addEventListener('DOMContentLoaded', function () {
         console.log(Date.now(),'Message from signalling server:', data);
         if (data.type === 'offer') {
             console.log("controller for offer", data)
-            await handleOfferAndCreateAnswer(data.offer);
+            var result = confirm(`Are you good with the offer? Request: ${data.wishMessage}, monetizingValue: ${data.monetizeValue}`);
+            if (result){
+                await handleOfferAndCreateAnswer(data.offer);
+            }else{
+                // implement an event to signalling mechanism for flagging the requestID
+                socket.emit("join_broadcast")
+            }
         } else if (data.type === 'answer') {
             console.log("controller for answer", data)
             await handleAnswer(data);
@@ -192,7 +208,7 @@ document.addEventListener('DOMContentLoaded', function () {
     pc.onconnectionstatechange = event => {
         console.log(`connection State change: ${pc.connectionState}`);
         console.log('connection State change event:', event);
-        if (pc.connectionState === "failed") {
+        if (pc.connectionState === "failed" | pc.connectionState === "closed") {
             console.error("Peer Connection Failed.");
             console.log(pc)
             // refresh the browswer for availabity in fleet once the connection has been dropped.
@@ -241,8 +257,7 @@ document.addEventListener('DOMContentLoaded', function () {
             console.log(`Data channel ${channel.label} opened by remote peer.`);
             if (chatLayout.style.display === 'none'){
                 genieLayout.style.display = 'none'
-                chatLayout.style.display = 'block'
-                
+                chatLayout.style.display = 'block'         
             }
             // socket.emit('chat_established', {'data': 'connected'});
             socket.send(JSON.stringify({type: 'dataChannelOpened'})); 
@@ -270,22 +285,37 @@ document.addEventListener('DOMContentLoaded', function () {
             chatConsoleElement.innerHTML += `<p>Sent: ${message}</p>`;
             chatInputElement.value = '';
         };
-    };            
+    };   
+    
+    chatEndButton.onclick = function() {
+        if (chatLayout.style.display === 'block'){
+            chatLayout.style.display = 'none' 
+            genieLayout.style.display = 'block'         
+        }
+        window.location.reload();
+    };
 
-    broadcastButton.onclick = event =>{
+    broadcastButton.onclick = event => {
         // ensuring page is not reloaded()
         
-
         console.log("create offer event data:", event)
         const dataChannel = pc.createDataChannel("chat");
+        let radius = rangeValue.value;
         let broadcastMsg = wishMessage.value;
+        let monetizeValue = bidValue.value;
+        let broadcastTime = bufferTime.value;
+        let addPerson = selectedNetwork
+
+        console.log('radius value is:', radius)
         pc.createOffer().then(offer => {
             pc.setLocalDescription(offer);
             console.log("Offer function has been activated")
             console.log("wish message value", wishMessage.value)
+            console.log("broadcast time value", broadcastTime)
+            console.log("add network valuee is:", addPerson)
             console.log(pc)
             // socket.send(JSON.stringify({type: 'offer', offer: offer, wishMessage: 'test'}));
-            socket.emit('onbroadcast', JSON.stringify({type: 'offer', offer: offer, wishMessage: broadcastMsg}));
+            socket.emit('onbroadcast', JSON.stringify({type: 'offer', offer: offer, 'wishMessage': broadcastMsg, 'broadcastRange': radius, 'monetizeValue': monetizeValue, 'broadcastTime': broadcastTime, 'addNetwork': addPerson}));
             // document.getElementById('genieForm').reset();
 
         }).catch(e => console.error(e));

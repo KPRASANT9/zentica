@@ -26,10 +26,62 @@ body {
     transform: translateX(-50%);
 }
 
+.dropdown {
+    position: relative;
+    display: inline-block;
+  }
+  
+/* Dropdown button style */
+.dropbtn {
+background-color: #f9f9f9;
+color: black;
+padding: 8px;
+font-size: 16px;
+border: 1px solid #ccc;
+cursor: pointer;
+}
+
+/* Dropdown content */
+.dropdown-content {
+display: none;
+position: absolute;
+background-color: #f9f9f9;
+min-width: 160px;
+box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+z-index: 1;
+}
+
+/* Dropdown items style */
+.dropdown-content a {
+color: black;
+padding: 12px 16px;
+text-decoration: none;
+display: block;
+}
+
+/* Change color of dropdown links on hover */
+.dropdown-content a:hover {background-color: #f1f1f1}
+
+/* Show the dropdown menu on hover */
+.dropdown:hover .dropdown-content {
+display: block;
+}
+
+/* Change dropdown button color on hover */
+.dropdown:hover .dropbtn {
+background-color: #e7e7e7;
+}
+
 .form-container input + input, /* Space between adjacent input fields */
 .form-container input[type='range'] + button { /* Space between an input field directly followed by a button */
     padding: 50px;
 }
+
+
+
+
+
+
 
 input[type="range"] {
     width: 80%;
@@ -39,6 +91,8 @@ input[type="range"] {
     border: 1px solid #ddd;
     border-radius: 4px;
 }
+
+
 
 input[type="text"] {
     width: 80%;

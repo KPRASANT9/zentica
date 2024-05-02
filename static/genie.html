@@ -4,10 +4,149 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Welcome to GENIE</title>
-    <link rel="stylesheet" href="/static/css/geniestyle.css"> <!-- Link to CSS file for styling -->
+    <link rel="stylesheet" href="/static/css/geniestyle.css">
+    <style>
+        .dropdown {
+            position: relative;
+            display: inline-block;
+        }
+        .dropbtn {
+        background-color: #4CAF50;
+        color: white;
+        padding: 8px;
+        font-size: 16px;
+        border: navy;
+        cursor: pointer;
+        }
+
+        .dropdown-content {
+        display: none;
+        position: absolute;
+        background-color: #f9f9f9;
+        min-width: 160px;
+        box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+        z-index: 1;
+        }
+
+        .dropdown-content input[type="checkbox"] {
+        margin: 5px;
+        cursor: pointer;
+        }
+
+        .dropdown-content label {
+        margin-left: 5px;
+        cursor: pointer;
+        }
+
+        .dropdown:hover .dropdown-content {
+        display: block;
+        }
+    </style>
     <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <script>
+        function updateValue(slider) {
+          var span = document.getElementById('sliderValue')
+          var value = slider.value
+          span.textContent = value;
+
+          // Calculate position
+          var max = slider.max;
+          var min = slider.min;
+          var newValue = Number(((value - min) * 100) / (max - min));
+          var newPosition = 10 - (newValue * 0.2);
+          span.style.left = `calc(${newValue}% + (${newPosition}px))`;
+        }
+
+        // var dropdownButton = document.getElementById('dropdownButton');
+        // var dropdownContent = document.getElementById('dropdownContent');
+        // var selectedValueInput = document.getElementById('selectedValueInput');
+        
+        // // Event listener for the dropdown button to toggle the dropdown content
+        // dropdownButton.addEventListener('click', function(event) {
+        // // Prevent the page from scrolling to the top when clicking on the button
+        // event.preventDefault();
+        
+        // // Toggle the display of the dropdown content
+        // dropdownContent.style.display = dropdownContent.style.display === 'block' ? 'none' : 'block';
+        // });
+        // document.getElementById('myDropdown').addEventListener('change', function() {
+        // var selectedValue = this.value;
+        // console.log("Selected value:", selectedValue); // You can use this variable as needed
+        // });
+
+        // document.querySelectorAll('.dropdown-content').forEach(function(item) {
+        //     item.addEventListener('click', function(e) {
+        //         e.preventDefault(); // Prevent the default anchor link behavior
+        //         var selectedValue = this.textContent; // Set the selectedValue variable to the text of the clicked item
+        //         console.log('Selected value:', selectedValue); // This line is for demonstration and can be removed
+        //         // Update the button text to show the selected item
+        //         document.querySelector('.dropbtn').textContent = selectedValue;
+        //     });
+        // });
+        
+        // const items = ["Healthcare", "Education", "Technology", "Hospitality", "Finance", "Retail", "Transportation", "Professional", "Arts", "Manufacturing", "Marketing", "Public", "Retail", "Agriculture", "Environmental", "Other"];
+        //     // Use fetch to send the GET request
+        function addNetwork(){
+            var selectedNetwork = [];
+            fetch("https://meet-basilisk-adversely.ngrok-free.app/api/device/list")
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok ' + response.statusText);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log("value of data is:", data)
+                    const items = data
+                    const container = document.getElementById("dropdown-content");
+                    items.forEach(item => {
+                        const checkbox = document.createElement("input");
+                        checkbox.type = "checkbox";
+                        checkbox.id = item;
+                        checkbox.value = item;
+                        checkbox.onclick = handleSelection;
+
+                        const label = document.createElement("label");
+                        label.htmlFor = item;
+                        label.textContent = item;
+
+                        container.appendChild(checkbox);
+                        container.appendChild(label);
+                        container.appendChild(document.createElement("br"));
+                    });
+
+                })
+                .catch(error => {
+                    console.error('Error:', error); // Handle any errors
+                });
+            }
+
+        // Function to handle checkbox selection
+        var selectedNetwork = [];
+        function handleSelection(event) {
+            if (event.target.checked) {
+                selectedNetwork.push(event.target.value);
+            } else {
+                selectedNetwork = selectedNetwork.filter(item => item !== event.target.value);
+            }
+        console.log("selected items are:", selectedNetwork)
+        }
+
+        function toggleDropdown() {
+            const dropdownContent = document.getElementById("dropdown-content");
+            dropdownContent.style.display = dropdownContent.style.display === 'block' ? 'none' : 'block';
+        }
+
+        // Initialize dropdown on page load
+        window.onload = addNetwork;
+    </script>
 </head>
 <body>
+    <!-- <div class="confirmation-container" id="confirmationContainer">
+        <h2>Are you sure you want to proceed?</h2>
+        <button onclick="confirmAction()">Yes, Proceed</button>
+        <button onclick="cancelAction()">Broadcast</button>
+    </div> -->
     <div class="form-container" id='genieForm' style="display: block">
         <form id="genieForm">
             <!-- <h2>GENIE</h2> -->
@@ -19,12 +158,37 @@
                 <label for="bid-value" ></label>
                 <input type="text" id="bid-value" placeholder="Bid value: $" name="bid-value" required >
             </div>
-            <!-- <div>
+            <div id="sliderContainer">
                 <label for="rangeSlider"></label>
-                <input type="range" id="rangeSlider" name="volume" min="0" max="100" value="50">
-                <output id="rangeValue" for="rangeSlider"></output>
+                <input type="range" id="rangeSlider" name="volume" min="0" max="13000" value="2" oninput="updateValue(this)">
+                <span id="sliderValue" style="left: 50%;"></span>
+                <!-- <output id="rangeValue" for="rangeSlider"></output> -->
+            </div>
+            <!-- <div class="dropdown">
+                <button id="dropdownButton" class="dropbtn">Select time</button>
+                <div id="dropdownContent" class="dropdown-content">
+                  <a href="#" class="dropdown-item">5</a>
+                  <a href="#" class="dropdown-item">10</a>
+                  <a href="#" class="dropdown-item">20</a>
+                  <a href="#" class="dropdown-item">30</a>
+                </div>
             </div> -->
+            <div class="dropdown">
+                <select id="bufferTime">
+                    <option value=5>5</option>
+                    <option value=10>10</option>
+                    <option value=20>20</option>
+                    <option value=30>30</option>
+                </select>
+            </div>
             <button type="submit" id="broadcast">Broadcast</button>
+            <!-- <button type="submit" id="addPeople">Add contact</button> -->
+            <div class="dropdown">
+                <button onclick="toggleDropdown()" class="dropbtn">Add contact</button>
+                <div id="dropdown-content" class="dropdown-content">
+                    <!-- Checkbox items will be added here dynamically -->
+                </div>
+            </div>
             <!-- <a href="/static/client.html"></a> -->
             <div id="output"></div>
         </form>
@@ -46,6 +210,7 @@
                 <output id="rangeValue" for="rangeSlider"></output>
             </div> -->
             <button type="submit" id="send">Send</button>
+            <button type="submit" id="end">End</button>
             <!-- <a href="/static/client.html"></a> -->
             <div id="chatConsole"></div>
         </form>
