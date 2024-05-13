@@ -9,7 +9,7 @@ import ssl
 from aiortc import RTCPeerConnection, RTCSessionDescription, MediaStreamTrack, RTCIceCandidate, RTCDataChannel
 
 # Application specific
-from db import get_device_collection, get_location_collection
+from db import get_device_collection, get_location_collection, get_chat_collection
 
 # LLM specific
 from langchain_core.messages import HumanMessage
@@ -22,6 +22,7 @@ from datetime import datetime, timedelta
 import time
 from bson.json_util import dumps
 import json
+from bson import ObjectId
 from bidict import bidict
 import itertools
 
@@ -29,6 +30,11 @@ import itertools
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from asyncio import Lock
 import asyncio
+
+# chat related application
+
+import jwt
+import os
 
 from dotenv import load_dotenv
 import os
@@ -44,6 +50,7 @@ logger = logging.getLogger(__name__)
 # Create Quart app
 
 app = Quart(__name__, static_folder='static', static_url_path='/static')
+app.config['SECRET_KEY'] = 'your_secret_key'
 app.config['DEBUG'] = True
 app = cors(app)
 scheduler = AsyncIOScheduler()  # Scheduler initialization
@@ -86,11 +93,20 @@ zentica_demo = socketio.ASGIApp(sio, app)
 #                 await sio.send(data, sid=shared_var['sid'])
 #                 logger.debug("shared var value is:" shared_var)
 
+# Setup MongoDB connection
 
 
+async def get_messages(request):
+    group_id = request.query['group_id']
+    messages = []
+    async for message in db.messages.find({'groupId': group_id}):
+        messages.append(message)
+    return web.json_response(messages)
 
-
-
+async def send_message(request):
+    data = await request.json()
+    await db.messages.insert_one(data)
+    return web.Response(text="Message sent successfully")
 # WebRTC implementation
 
 load_dotenv()
@@ -191,7 +207,7 @@ async def poll_audit_events():
 
 # TODO persist the audit signal state to DB once the chat has been estalished.
 
-def get_device_id(environ):
+def get_params(environ):
         query_string = environ.get('QUERY_STRING', '')
         query_params = {key: value for key, value in (item.split('=') for item in query_string.split('&') if '=' in item)}
         return query_params
@@ -383,6 +399,16 @@ async def lookup_notify_peers(sid, event_graph, connected_network):
     if remote_peers:
         await notify_peers(sid, event_graph, remote_peers)    
 
+async def authenticate(token):
+    try:
+        payload = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+        return payload
+    except jwt.ExpiredSignatureError:
+        abort(401, 'Token expired')
+    except jwt.InvalidTokenError:
+        abort(401, 'Invalid token')
+
+
 # PreOperation
 @sio.event
 async def connect(sid, environ):
@@ -390,15 +416,34 @@ async def connect(sid, environ):
     Event handler once the connection has been setup to client
     """
     # Map deviceID with SID
-    query_params = get_device_id(environ)
+    query_params = get_params(environ)
     DeviceID = query_params.get('DeviceID', None)
     # Location = query_params.get('Location', None)
     # REfine it at later point in time
     device_session_map[DeviceID] = sid 
+
+    #authenticating user with JWT.
+    jwt_token = query_params.get('token', None)
+    user = await authenticate(jwt_token)
+    if not user:
+        return False  # Disconnect the client if authentication fails
+    print('Client authenticated and connected')
     
-    logger.debug(f'connected clients are: {device_session_map}')
-    logger.debug(f'event graph signal state: {event_graph.to_dict()}')
+    print("connected clients are:", device_session_map)
+    print("event graph signal state:", event_graph.to_dict())
     await sio.emit('your_session_id', {'sid': sid}, to=sid)
+
+@sio.event
+async def send_message(data):
+    # Store message in MongoDB
+    await db.messages.insert_one({
+        'user_id': data['user_id'],
+        'username': data['username'],
+        'message': data['message'],
+        'created_at': datetime.now()
+    })
+    # Emit message to all clients
+    await socketio.emit('new_message', data)
 
 @sio.event
 async def join_broacast(sid):
@@ -700,6 +745,29 @@ async def track_device():
     location_collection = get_location_collection()
     location = location_collection.find_one({'DeviceID': device_id}, sort=[('Timestamp', -1)])
     return dumps(location)
+
+@app.route('/api/collab/messages', methods=['GET'])
+async def get_messages():
+    print(request)
+    group_id = request.args.get['group_id']
+    chat_collection = get_chat_collection()
+    messages = []
+    async for message in chat_collection.find({'groupId': group_id}):
+        messages.append(message)
+    return dumps(messages)
+
+@app.route('/api/collab/message', methods=['POST'])
+async def send_message():
+    data = await request.json()
+    chat_collection = get_chat_collection()
+    await chat_collection.insert_one({
+        'groupId': ObjectId(data['groupId']),
+        'sender': ObjectId(data['sender']),
+        'message': data['message']
+        # 'taggedUsers': [ObjectId(user) for user in data['taggedUsers']]
+        # 'createdAt': data.get('createdAt')
+    })
+    return {'status': 'success'}, 201
 
 # As part of updating the location, ensure whether it would help the user in establishing the broadcast.
 # def insert_new_location(device_id, coordinates, endpoint, user_email):

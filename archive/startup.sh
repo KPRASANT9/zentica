@@ -7,4 +7,3 @@ hypercorn app:zentica_demo --reload
 
 # starting web service
 ngrok start demozentica
-

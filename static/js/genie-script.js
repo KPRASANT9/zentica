@@ -64,7 +64,8 @@ document.addEventListener('DOMContentLoaded', function () {
     var socket = io(
         'https://meet-basilisk-adversely.ngrok-free.app/', {
         query: {
-            DeviceID: params.get('DeviceID')
+            DeviceID: params.get('DeviceID'),
+            token: "YOUR_JWT_TOKEN"
         }
     });
 

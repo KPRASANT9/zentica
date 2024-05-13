@@ -2,40 +2,114 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>CHAT BOT</title>
-    <script type="text/javascript">
-        document.addEventListener('DOMContentLoaded', function() {
-            const consoleElement = document.getElementById('output');
-            const inputElement = document.getElementById('input');
-            const sendButton = document.getElementById('send');
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Communicator Tab</title>
+    <style>
+        #app-container {
+            display: flex;
+            height: 400px;
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            width: 600px;
+        }
 
-            channel = JSON.parse(sessionStorage.getItem('channel'))
-            console.log("value from session storage:", channel)
+        #user-list {
+            width: 150px;
+            background-color: #f0f0f0;
+            padding: 10px;
+            border-right: 1px solid #ccc;
+            overflow-y: auto;
+        }
 
-            channel.onmessage = function(event) {
-                // console.log("SDP final state remote:", pc.sdp);
-                consoleElement.innerHTML += `<p>Received: ${event.data}</p>`;
-                console.log(`Message received on ${channel.label}: ${event.data}`);
-            };
+        .user {
+            padding: 5px;
+            cursor: pointer;
+        }
 
-            channel.onclose = function(event) {
-                console.log(`Data channel ${channel.label} closed.`);
-            };
-            
-            // Emit a message when the send button is clicked
-            sendButton.onclick = function() {
-                let message = inputElement.value;
-                dataChannel.send(message);
-                consoleElement.innerHTML += `<p>Sent: ${message}</p>`;
-                inputElement.value = '';
-            };
-        });
-    </script>
+        .user:hover {
+            background-color: #e0e0e0;
+        }
+
+        #chat-container {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            background-color: #f9f9f9;
+            border-left: 1px solid #ccc;
+        }
+
+        #chat-box {
+            padding: 10px;
+            overflow-y: scroll;
+            flex-grow: 1;
+        }
+
+        #message-form {
+            display: flex;
+        }
+
+        #message-input {
+            flex-grow: 1;
+            padding: 10px;
+        }
+
+        #message-form button {
+            padding: 10px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+        }
+    </style>
 </head>
 <body>
-    <h1>CHAT BOT</h1>
-    <input type="text" id="input" placeholder="Enter a message" />
-    <button id="send">Send</button>
-    <div id="output"></div>
+    <div id="app-container">
+        <div id="user-list">
+            <!-- Static list of users for demonstration -->
+            <div class="user" data-userid="1">User 1</div>
+            <div class="user" data-userid="2">User 2</div>
+            <div class="user" data-userid="3">User 3</div>
+        </div>
+        <div id="chat-container">
+            <div id="chat-box">
+                <!-- Messages will be displayed here -->
+            </div>
+            <form id="message-form">
+                <input type="text" id="message-input" placeholder="Type a message..." />
+                <button type="submit">Send</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('message-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            var messageInput = document.getElementById('message-input');
+            var message = messageInput.value;
+            if (message.trim() !== '') {
+                var chatBox = document.getElementById('chat-box');
+                var newMessage = document.createElement('div');
+                newMessage.textContent = message;
+                chatBox.appendChild(newMessage);
+                chatBox.scrollTop = chatBox.scrollHeight;
+                messageInput.value = '';
+            }
+        });
+
+        // Handle user selection
+        document.querySelectorAll('.user').forEach(user => {
+            user.addEventListener('click', function() {
+                var userId = this.getAttribute('data-userid');
+                switchUser(userId);
+            });
+        });
+
+        function switchUser(userId) {
+            document.getElementById('chat-box').innerHTML = ''; // Clear current messages
+            // This is where you would add an AJAX call to fetch messages for the selected user
+            
+            console.log('Switched to user:', userId);
+        }
+    </script>
 </body>
 </html>
