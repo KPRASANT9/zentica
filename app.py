@@ -9,8 +9,7 @@ import ssl
 from aiortc import RTCPeerConnection, RTCSessionDescription, MediaStreamTrack, RTCIceCandidate, RTCDataChannel
 
 # Application specific
-from db import get_device_collection, get_location_collection, get_active_user_endpoints
-from broadcast import broadcast_message
+from db import get_device_collection, get_location_collection
 
 # LLM specific
 from langchain_core.messages import HumanMessage
@@ -37,6 +36,9 @@ import os
 from math import radians, sin, cos, sqrt, asin
 
 import logging
+import sys
+logging.basicConfig(level=logging.DEBUG, stream=sys.stdout)
+logger = logging.getLogger(__name__)
 # logging.basicConfig(level=logging.INFO)
 
 # Create Quart app
@@ -60,10 +62,10 @@ zentica_demo = socketio.ASGIApp(sio, app)
 #         self.shared_var = {}
 
 #     def connect(self, sid, environ):
-#         print("connect ", sid, self.shared_var)
+#         logger.debug("connect ", sid, self.shared_var)
 
 #     def disconnect(self, sid):
-#         print("disconnect ", sid, self.shared_var)
+#         logger.debug("disconnect ", sid, self.shared_var)
 
 #     def message(self, sid, data):
 #         message = json.loads(data)
@@ -72,17 +74,17 @@ zentica_demo = socketio.ASGIApp(sio, app)
 #             shared_var = {"sid": sid, "state": "broadcast"}
 #     #         handle_offer() # Broadcast the offer to rest of the connected clients except sender(Use SID from the event)
 #             await sio.send(data, skip_sid=sid)
-#             print("shared var value is:" shared_var)
+#             logger.debug("shared var value is:" shared_var)
 #         elif msg_type == 'answer':
 #             if shared_var['state'] == 'broadcast':
 #                 shared_var['target_peer'] = sid
 #                 await sio.send(data, sid=shared_var['sid'])
 #     #         forward_answer() #Forward only to the sid who had requested the offer
-#                 print("shared var value is:" shared_var)
+#                 logger.debug("shared var value is:" shared_var)
 #         elif msg_type == 'ice-candidate':
 #             if sid in [shared_var['sid'], shared_var['target_peer']]:
 #                 await sio.send(data, sid=shared_var['sid'])
-#                 print("shared var value is:" shared_var)
+#                 logger.debug("shared var value is:" shared_var)
 
 
 
@@ -176,13 +178,13 @@ event_graph = EventGraph()
 
 #Scheduler to refresh the state of the system
 async def poll_audit_events():
-    # print("Scheduler is working as expected!!")
+    # logger.debug("Scheduler is working as expected!!")
     global event_graph
-    # print("scheduler: event graph state:", event_graph.to_dict())
+    # logger.debug("scheduler: event graph state:", event_graph.to_dict())
     if 'retention_time' in event_graph.shared_variables:
-        # print('successfully navigated to inner loop of scheduler')
+        # logger.debug('successfully navigated to inner loop of scheduler')
         if (datetime.now() > event_graph.get_shared_variable('retention_time')):
-            # print("event sent for the client for his request:", device_session_map.inverse[audit_signal['requestor_id']])
+            # logger.debug("event sent for the client for his request:", device_session_map.inverse[audit_signal['requestor_id']])
             if 'serving_id' not in event_graph.shared_variables:
                 await sio.emit('no_peers', to=device_session_map[event_graph.get_shared_variable('client_id')])
             event_graph = EventGraph()
@@ -230,8 +232,8 @@ def find_matching_category(wishMessage, available_category):
     llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0, openai_api_key=api_key)#, max_tokens = 25)
     chain = prompt | llm | StrOutputParser()
     matching_network = chain.invoke({"dumps": dumps, "wishMessage": wishMessage})
-    print(f"Accepted values for LLM: Input - {wishMessage}, response - {matching_network}")
-    print(matching_network)
+    logger.debug(f"Accepted values for LLM: Input - {wishMessage}, response - {matching_network}")
+    logger.debug(matching_network)
     return json.loads(matching_network)['sector']
 
 async def on_answer(sid, data):
@@ -244,7 +246,7 @@ async def on_answer(sid, data):
         event_graph.update_shared_variable('serving_id', device_session_map.inverse[sid])
         # event_graph.update_shared_variable('transit_network', event_graph.get_lineage(device_session_map[sid]))
         # signal_state['state'] = 'served'
-        # print(datetime.now(), "message through signalling server:", data)
+        # logger.debug(datetime.now(), "message through signalling server:", data)
         await sio.send(data, to=device_session_map[event_graph.get_shared_variable('client_id')])
 
 def lookup_location(origin, message_obj, target):
@@ -262,14 +264,14 @@ def lookup_location(origin, message_obj, target):
         delta_lon = lon2 - lon1
         a = sin(delta_lat / 2)**2 + cos(lat1) * cos(lat2) * sin(delta_lon / 2)**2
         c = 2 * asin(sqrt(a))
-        print('value of c is',c)
+        logger.debug(f'value of c is,{c}')
         return str(R * c)
 
     origin_lat, origin_long = event_graph.get_event_state(origin)['lct']
     target_lat, target_long = event_graph.get_event_state(target)['lct']
     distance = haversine(origin_lat, origin_long, target_lat, target_long)
-    print(f'The distance between two devices - {origin} & {target} is: {distance}')
-    print(f'given radius value is - {radius}: {float(distance) <= float(radius)}')
+    logger.debug(f'The distance between two devices - {origin} & {target} is: {distance}')
+    logger.debug(f'given radius value is - {radius}: {float(distance) <= float(radius)}')
     return float(distance) <= float(radius)
 
 def lookup_peers(sid, event_graph, available_peers):
@@ -286,7 +288,7 @@ def lookup_peers(sid, event_graph, available_peers):
     """
     message_obj = json.loads(event_graph.get_shared_variable('offer'))
     device_id = device_session_map.inverse[sid]
-    print("Message body is", message_obj)
+    logger.debug(f'Message body is {message_obj}')
     # remote_clients = []
     # Retrieve DeviceID from sid - check the connection event
     # Based on the deviceID, identify the location and Profile - JSON
@@ -294,13 +296,13 @@ def lookup_peers(sid, event_graph, available_peers):
     # TODO ensure DeviceID is unique and duplicate values are not entered as part of registration from UI
     # TODO RAG Augmemented profile needs to be pulled to check for contraints going forward
     # device_profile = device_collection.find_one({'DeviceID': device_session_map[sid]}, sort=[('Timestamp', -1)])
-    # print("device profile values:", device_profile)
+    # logger.debug("device profile values:", device_profile)
 
     # available_network = list(device_session_map.values())
-    # print(f"Debug issue - remote_clients: {remote_clients}, removing element: {device_session_map[sid]}")
+    # logger.debug(f"Debug issue - remote_clients: {remote_clients}, removing element: {device_session_map[sid]}")
     # Make sure the requested client is not part of the peer selection while broadcasting
-    print("List of available peers:",available_peers)
-    print("event graph state values are:", event_graph.to_dict())
+    logger.debug(f'List of available peers:{available_peers}')
+    logger.debug(f'event graph state values are: {event_graph.to_dict()}')
     
 
     # If the event is triggered through UI(human or recursive), Broadcasting to their specific locations are enabled
@@ -340,7 +342,7 @@ def lookup_peers(sid, event_graph, available_peers):
             remote_peers = []
             for device in remote_obj:
                 remote_peers.append(device['DeviceID']) 
-        print("remote clients are", remote_peers)
+        logger.debug(f'remote clients are: {remote_peers}')
         return remote_peers
     else:
         return []
@@ -365,11 +367,11 @@ async def notify_peers(sid, event_graph, remote_clients):
         if device_session_map[peer]:
             broadcast_network.append(peer)
             event_graph.add_event(device_session_map.inverse[sid], peer)
-            print(datetime.now(), f"sending offer to sid:{device_session_map[peer]}")
+            logger.debug(f'{datetime.now()} sending offer to sid: {device_session_map[peer]}')
             # send offer to matching peer
             await sio.send(data, to=device_session_map[peer])
             # send candidates to matching peer
-            print("event graph during initiating candiate:", event_graph.to_dict())
+            logger.debug("event graph during initiating candiate:", event_graph.to_dict())
             if 'candidate' in event_graph.shared_variables:
                 for sdp in event_graph.get_shared_variable('candidate'):
                     await sio.send(sdp, to=device_session_map[peer])
@@ -394,8 +396,8 @@ async def connect(sid, environ):
     # REfine it at later point in time
     device_session_map[DeviceID] = sid 
     
-    print("connected clients are:", device_session_map)
-    print("event graph signal state:", event_graph.to_dict())
+    logger.debug(f'connected clients are: {device_session_map}')
+    logger.debug(f'event graph signal state: {event_graph.to_dict()}')
     await sio.emit('your_session_id', {'sid': sid}, to=sid)
 
 @sio.event
@@ -414,14 +416,14 @@ async def join_broacast(sid):
 
 @sio.event
 async def disconnect(sid):
-    print("disconnect: event graph state:", event_graph.to_dict())
+    logger.debug("disconnect: event graph state:", event_graph.to_dict())
     # if device_session_map[sid] in [event_graph.get_shared_variable('client_id'), event_graph.get_shared_variable('serving_id')]:
     #     event_graph = EventGraph()
     if sid in device_session_map.values():
         if event_graph.event_states:
             del event_graph.event_states[device_session_map.inverse[sid]]
         del device_session_map.inverse[sid]
-        print(f'After disconnection - dsm: {device_session_map}')
+        logger.debug(f'After disconnection - dsm: {device_session_map}')
 
 @sio.event
 async def update_location(sid, message):
@@ -430,7 +432,7 @@ async def update_location(sid, message):
     '''
     device_id = device_session_map.inverse[sid]
     msg_obj = json.loads(message)
-    print("device location coordinates are:", msg_obj)
+    logger.debug(f'device location coordinates are: {msg_obj}')
     event_graph.update_event_state(device_id, {'lct': msg_obj['data']})
     # ensuring the remote clients are served for the existing request.
     if event_graph.get_shared_variable('client_id'):
@@ -448,11 +450,11 @@ async def update_location(sid, message):
 #             'coordinates': (message['coords']['latitude'], message['coords']['longitude'])
 #         }
 #     }, upsert=True)
-#     print('successfully updated the location data:', data)
+#     logger.debug('successfully updated the location data:', data)
 
 @sio.event
 async def onbroadcast(sid, data):
-    print("broadcast event trigger has been called", data)
+    logger.debug("broadcast event trigger has been called", data)
 
     data_obj = json.loads(data)
 
@@ -470,7 +472,7 @@ async def onbroadcast(sid, data):
     # using LLM to classify the category for the request
     available_category = ["Healthcare", "Education", "Technology", "Hospitality", "Finance", "Retail", "Transportation", "Professional", "Arts", "Manufacturing", "Marketing", "Public", "Retail", "Agriculture", "Environmental", "Other"]
     assigned_category = find_matching_category(data_obj['wishMessage'], available_category)
-    print(f"LLM into ACTION: for the wish message: {data_obj['wishMessage']}, the assigned category is: {assigned_category}")
+    logger.debug(f"LLM into ACTION: for the wish message: {data_obj['wishMessage']}, the assigned category is: {assigned_category}")
     
     # Log broadcast event to audit_signal
     event_graph.add_event(device_session_map.inverse[sid], device_session_map.inverse[sid])
@@ -488,10 +490,10 @@ async def onbroadcast(sid, data):
         await lookup_notify_peers(sid, event_graph, connected_network)
     # remote_sids = [key for key, value in device_session_map.items() if value in remote_clients]
     
-    # print(f'OFFER:Testing run time values - audit_signal: {audit_signal}, current-sid: {sid}')
+    # logger.debug(f'OFFER:Testing run time values - audit_signal: {audit_signal}, current-sid: {sid}')
     
     # for each_sid in remote_sids:
-    #     print(datetime.now(), f"sending offer to sid:{each_sid}")
+    #     logger.debug(datetime.now(), f"sending offer to sid:{each_sid}")
     #     await sio.send(data, to=each_sid)
 
 
@@ -500,15 +502,15 @@ async def onbroadcast(sid, data):
 #     Broadcast the messsage to the available users based on the 
 #     location, customer intent and priority.
 #     """
-#     print("OFFER: remote client values:", remote_clients)
+#     logger.debug("OFFER: remote client values:", remote_clients)
 #     remote_sids = [key for key, value in device_session_map.items() if value in remote_clients]
 #     #audit information
 #     audit_signal['requestor_id'] = sid
 #     audit_signal['broadcasted_ids'] = remote_sids
 #     audit_signal['reference_mapping'] = device_session_map
-#     print(f'OFFER:Testing run time values - audit_signal: {audit_signal}, current-sid: {sid}')
+#     logger.debug(f'OFFER:Testing run time values - audit_signal: {audit_signal}, current-sid: {sid}')
 #     for each_sid in remote_sids:
-#         print(datetime.now(), f"sending offer to sid:{each_sid}")
+#         logger.debug(datetime.now(), f"sending offer to sid:{each_sid}")
 #         await sio.send(data, to=each_sid)
     # await sio.send(data, skip_sid=sid)
 
@@ -525,35 +527,35 @@ async def on_candidate(sid, data):
     device_id = device_session_map.inverse[sid]
     
     if device_id == event_graph.get_shared_variable('client_id'):
-        print(datetime.now(),"message through signalling server:", data)
+        logger.debug(f'{datetime.now()} message through signalling server: {data}')
         if 'candidate' not in event_graph.shared_variables:
             event_graph.update_shared_variable('candidate', [])
         event_graph.get_shared_variable('candidate').append(data)
-        # print("audited value:",audit_signal)
+        # logger.debug("audited value:",audit_signal)
         if 'serving_id' in event_graph.shared_variables:
-            print(datetime.now(),"serving candidate to ideal peer:", data)
+            logger.debug(f'{datetime.now()} serving candidate to ideal peer: {data}')
             await sio.send(data, to=device_session_map[event_graph.get_shared_variable('serving_id')])
         elif 'broadcast_ids' in event_graph.get_event_state(device_id):
-            print(datetime.now(),"serving candidate to braodcast peer:", data)
+            logger.debug(f'{datetime.now()} serving candidate to braodcast peer: {data}')
             for device in event_graph.get_event_state(device_id)['broadcast_ids']:
                 await sio.send(data, to=device_session_map[device])
     elif device_id == event_graph.get_shared_variable('serving_id'):
-        print(datetime.now(),"message through signalling server:", data)
-        # print("audited value:",audit_signal)
+        logger.debug(f'{datetime.now()} message through signalling server: {data}')
+        # logger.debug("audited value:",audit_signal)
         if 'client_id' in event_graph.shared_variables:
             await sio.send(data, to=device_session_map[event_graph.get_shared_variable('client_id')])
-    # print("audit signal values are:", audit_signal)
-        # print(signal_state)
+    # logger.debug("audit signal values are:", audit_signal)
+        # logger.debug(signal_state)
 
     # if signal_state['state'] == 'broadcast':
     #     signal_state['target_peer'] = sid
     #     signal_state['state'] = 'served'
-    #     print("message through signalling server:", data)
+    #     logger.debug("message through signalling server:", data)
     #     await sio.send(data, to=signal_state['sid'])
 
 @sio.event
 async def chat_established(sid):
-    print("after chat has been established")
+    logger.debug("after chat has been established")
 
 @sio.event
 async def message(sid, data):
@@ -564,53 +566,53 @@ async def message(sid, data):
 
     Redirects the response to peers based on the signalling logic. 
     """
-    print("Message receieved at Signalling Mechanism:", data)
-    print("device sesssion map values are:", device_session_map)
-    # print("audit signal values are:", audit_signal)
+    logger.debug(f'Message receieved at Signalling Mechanism: {data}')
+    logger.debug(f'device sesssion map values are: {device_session_map}')
+    # logger.debug("audit signal values are:", audit_signal)
     # if len(device_session_map.keys()) > 1:
         # remote_clients = audit_signal['broadcasted_ids']
         # if remote_clients:
     message = json.loads(data)
     msg_type = message['type']
-    # print("signalling message:", message)
+    # logger.debug("signalling message:", message)
     # if msg_type == 'offer':      
     #     # reset_offer_audit()
-    #     # print("OFFER:AFTER AUDIT MESSAGE:::::::::::::::::::::::", audit_signal)          
+    #     # logger.debug("OFFER:AFTER AUDIT MESSAGE:::::::::::::::::::::::", audit_signal)          
     #     # audit_signal["sid"] = sid
     #     # signal_state["state"] = "broadcast"
-    #     print("***************************Offer****************")
+    #     logger.debug("***************************Offer****************")
     #     def message_acknowledged():
-    #         print("Message was acknowledged by client")
-    #     print(datetime.now(),"message through signalling server:", data)
+    #         logger.debug("Message was acknowledged by client")
+    #     logger.debug(datetime.now(),"message through signalling server:", data)
     #     await broadcast_peers(sid, data, remote_clients)
-    #     print("************************OfferEnd***********************")    
+    #     logger.debug("************************OfferEnd***********************")    
     #     # await sio.send(data, skip_sid=sid, callback=message_acknowledged)
 
     if msg_type == 'answer':
-        print("***************************answer****************")
-        # print("ANSWER:AUDIT MESSAGE:::::::::::::::::::::::", audit_signal)   
-        print(datetime.now(),"message through signalling server:", data)       
+        logger.debug("***************************answer****************")
+        # logger.debug("ANSWER:AUDIT MESSAGE:::::::::::::::::::::::", audit_signal)   
+        logger.debug(f'{datetime.now()}, message through signalling server: {data}')       
         await on_answer(sid, data) #Forward only to the sid who had requested the offer
-        print("***************************answeEnd****************")
+        logger.debug("***************************answeEnd****************")
             # await sio.send(data, to=signal_state['sid'])
-            # print(signal_state)
+            # logger.debug(signal_state)
     elif msg_type == 'candidate':
-        print("***************************candidate****************")
-        # print("CANDIDATE:AUDIT MESSAGE:::::::::::::::::::::::", audit_signal)
-        # print(f'Testing run time values - offer-sid: {audit_signal['requestor_id']}, target-sid: {audit_signal['serving_peer']}, current-sid: {sid}, message_type: {msg_type}')
+        logger.debug("***************************candidate****************")
+        # logger.debug("CANDIDATE:AUDIT MESSAGE:::::::::::::::::::::::", audit_signal)
+        # logger.debug(f'Testing run time values - offer-sid: {audit_signal['requestor_id']}, target-sid: {audit_signal['serving_peer']}, current-sid: {sid}, message_type: {msg_type}')
         await on_candidate(sid, data)
-        print("************************candidateEnd*******************")
+        logger.debug("************************candidateEnd*******************")
         # if not signal_state['target_peer']:
-        #     print(datetime.now(),"message through signalling server:", data)
+        #     logger.debug(datetime.now(),"message through signalling server:", data)
         #     await sio.send(data, skip_sid=signal_state['sid'])
         # elif sid == signal_state['target_peer']:
-        #     print(datetime.now(),"message through signalling server:", data)
+        #     logger.debug(datetime.now(),"message through signalling server:", data)
         #     await sio.send(data, to=signal_state['sid'])
-            # print(signal_state)
+            # logger.debug(signal_state)
     elif msg_type == 'dataChannelOpened':
         # ensuring the connected peers are removed from broadcast.
         # this event is triggered by remote client once the connection has been established
-        print("chat has been established")
+        logger.debug("chat has been established")
         global event_graph
         for device in (sid, device_session_map[event_graph.get_shared_variable('client_id')]):
             event_graph = EventGraph()
@@ -655,8 +657,8 @@ async def genie_communication():
 async def register_device():
     # TODO: Implement timeout for API's for unexpected delays due to exception handling
     data = await request.json
-    print("data type of request:", data)
-    # print("request args:",request.args)
+    logger.debug(f'data type of request: {data}')
+    # logger.debug("request args:",request.args)
     device_collection = get_device_collection()
     device_collection.insert_one({
         'DeviceID': data['DeviceID'],
@@ -670,8 +672,8 @@ async def register_device():
 async def update_device():
     # TODO: Implement timeout for API's for unexpected delays due to exception handling
     data = await request.json
-    print("data type of request:", data)
-    # print("request args:",request.args)
+    logger.debug(f'data type of request: {data}')
+    # logger.debug("request args:",request.args)
     device_collection = get_device_collection()
     device_collection.find_one_and_update(
         {"DeviceID": data['DeviceID']},  # Query to find the document
@@ -693,7 +695,7 @@ async def list_devices():
 # Api's for retrieving the location details
 @app.route('/api/device/track', methods=['GET'])
 async def track_device():
-    print(request)
+    logger.debug(request)
     device_id = request.args.get('DeviceID')
     location_collection = get_location_collection()
     location = location_collection.find_one({'DeviceID': device_id}, sort=[('Timestamp', -1)])

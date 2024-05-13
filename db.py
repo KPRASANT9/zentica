@@ -1,10 +1,12 @@
 from pymongo import MongoClient
 from pymongo.collection import Collection
 from datetime import datetime, timedelta
+import os
 
 # Replace 'localhost' with your MongoDB host if different
 # client = MongoClient('mongodb://localhost:27017/')
-client = MongoClient('mongodb://tvast:password@127.0.0.1:27017/ps?authSource=admin')
+mongo_uri = os.getenv('MONGO_URI', 'mongodb://tvast:password@127.0.0.1:27017/ps?authSource=admin')
+client = MongoClient(mongo_uri)
 db = client.DeviceTracking
 
 def get_device_collection() -> Collection:

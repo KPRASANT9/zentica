@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Group Chat</title>
+    <style>
+        #chat-container {
+            display: flex;
+            flex-direction: column;
+            height: 500px;
+            width: 300px;
+            border: 1px solid #ccc;
+            padding: 10px;
+            overflow-y: scroll;
+        }
+        #message-input {
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="chat-container">
+        <!-- Messages will be added here -->
+    </div>
+    <input type="text" id="message-input" placeholder="Type a message...">
+    <button onclick="sendMessage()">Send</button>
+
+    <script>
+        function sendMessage() {
+            var input = document.getElementById('message-input');
+            var message = input.value;
+            input.value = '';
+            var messageElement = document.createElement('div');
+            messageElement.textContent = message;
+            document.getElementById('chat-container').appendChild(messageElement);
+        }
+    </script>
+</body>
+</html>

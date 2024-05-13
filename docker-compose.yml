@@ -1,6 +1,20 @@
 version: "3"
 
 services:
+  quart_app:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    # depends_on:
+    #   mongo_db:
+    #     condition: service_healthy
+    environment:
+      - ENV=dev
+      - MONGO_URI=mongodb://tvast:password@mongo_db:27017/ps?authSource=admin
+    command: hypercorn app:zentica_demo --bind 0.0.0.0:8000
+
   mongo_db:
     image: mongo
     restart: unless-stopped
@@ -9,11 +23,15 @@ services:
 
     ports:
       - "27017:27017"
-      - "22:22"
     environment:
       - MONGO_INITDB_ROOT_USERNAME=tvast
       - MONGO_INITDB_ROOT_PASSWORD=password
       - MONGO_INITDB_DATABASE=ps
+    # healthcheck:
+    #   test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')"]
+    #   interval: 10s
+    #   timeout: 10s
+    #   retries: 5
 
 #   redis_db:
 #     image: redis:6.2.5-alpine
